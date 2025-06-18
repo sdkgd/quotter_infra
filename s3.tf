@@ -99,3 +99,11 @@ resource "aws_s3_bucket_policy" "s3_static_file_public_access" {
   bucket = aws_s3_bucket.static_file.id
   policy = data.aws_iam_policy_document.s3_static_file_public_access.json
 }
+
+#####################################################
+# Task Definition file Bucket
+#####################################################
+
+resource "aws_s3_bucket" "task_definition_file" {
+  bucket = "${local.identifier}-${local.app_name}-task-definition-file"
+}

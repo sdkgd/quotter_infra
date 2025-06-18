@@ -1,0 +1,56 @@
+{
+  "family": "quotter",
+  "runtimePlatform": {"operatingSystemFamily": "LINUX"},
+  "taskRoleArn": "arn:aws:iam::AWS_ACCOUNT_ID:role/quotter-ecs-task-role",
+  "executionRoleArn": "arn:aws:iam::AWS_ACCOUNT_ID:role/quotter-ecs-task-execution-role",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name":"migration",
+      "image":"",
+      "logConfiguration":{
+          "logDriver":"awslogs",
+          "options":{
+              "awslogs-region":"ap-northeast-1",
+              "awslogs-group":"/ecs/quotter/php",
+              "awslogs-stream-prefix":"ecs"
+          }
+      },
+      "secrets":[
+        {
+          "name":"APP_KEY",
+          "valueFrom":"/quotter/APP_KEY"
+        },
+        {
+          "name":"DB_NAME",
+          "valueFrom":"/quotter/DB_NAME"
+        },
+        {
+          "name":"DB_USERNAME",
+          "valueFrom":"/quotter/DB_USERNAME"
+        },
+        {
+          "name":"DB_PASSWORD",
+          "valueFrom":"/quotter/DB_PASSWORD"
+        },
+        {
+          "name":"DB_HOST",
+          "valueFrom":"/quotter/DB_HOST"
+        },
+        {
+          "name":"AWS_BUCKET",
+          "valueFrom":"/quotter/AWS_BUCKET"
+        }
+      ],
+      "environmentFiles":[
+        {
+          "value":"arn:aws:s3:::cognitobirm-quotter-env-file/php/.prod.env",
+          "type":"s3"
+        }
+      ]
+    }
+  ]
+}
