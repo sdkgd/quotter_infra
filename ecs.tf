@@ -35,6 +35,31 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution-role-policy-attach
   policy_arn = data.aws_iam_policy.ecs_task_execution_policy.arn
 }
 
+resource "aws_iam_policy" "service_discovery" {
+  policy = jsonencode({
+    "Version":"2012-10-17"
+    "Statement":[
+      {
+        "Effect": "Allow",
+        "Action": [
+            "servicediscovery:RegisterInstance",
+            "servicediscovery:DeregisterInstance",
+            "servicediscovery:ListServices",
+            "servicediscovery:GetService",
+            "servicediscovery:GetInstancesHealthStatus",
+            "servicediscovery:DiscoverInstances"
+        ],
+        "Resource": "*"
+      },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_task_execution-role-service-discovery-policy-attachment" {
+  role = aws_iam_role.ecs_task_execution_role.name
+  policy_arn = aws_iam_policy.service_discovery.arn
+}
+
 #####################################################
 # Cloudwatch Log Group
 #####################################################
@@ -49,12 +74,17 @@ resource "aws_cloudwatch_log_group" "php" {
   retention_in_days = 30
 }
 
+resource "aws_cloudwatch_log_group" "next" {
+  name = "/ecs/${local.app_name}/next"
+  retention_in_days = 30
+}
+
 #####################################################
 # ECS Task Definition
 #####################################################
 
-resource "aws_ecs_task_definition" "this" {
-  family = "${local.app_name}"
+resource "aws_ecs_task_definition" "web" {
+  family = "${local.app_name}-web"
   network_mode = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu = 256
@@ -65,14 +95,16 @@ resource "aws_ecs_task_definition" "this" {
     {
       name="web"
       image="${aws_ecr_repository.web.repository_url}:latest"
-      portMappings=[{
-        containerPort:80
-        protocol:"tcp"
-      }]
-      dependsOn=[{
-        containerName:"php"
-        condition:"START"
-      }]
+      portMappings=[
+        {
+          containerPort:3030
+          protocol:"tcp"
+        },
+        {
+          containerPort:9090
+          protocol:"tcp"
+        }
+      ]
       logConfiguration={
         logDriver="awslogs"
         options={
@@ -82,6 +114,18 @@ resource "aws_ecs_task_definition" "this" {
         }
       }
     },
+  ])
+}
+
+resource "aws_ecs_task_definition" "php" {
+  family = "${local.app_name}-php"
+  network_mode = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu = 256
+  memory = 512
+  execution_role_arn = aws_iam_role.ecs_task_execution_role.arn
+  task_role_arn = aws_iam_role.ecs_task_role.arn
+  container_definitions = jsonencode([
     {
       name="php"
       image="${aws_ecr_repository.php.repository_url}:latest"
@@ -129,21 +173,51 @@ resource "aws_ecs_task_definition" "this" {
   ])
 }
 
+resource "aws_ecs_task_definition" "next" {
+  family = "${local.app_name}-next"
+  network_mode = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu = 256
+  memory = 512
+  execution_role_arn = aws_iam_role.ecs_task_execution_role.arn
+  task_role_arn = aws_iam_role.ecs_task_role.arn
+  container_definitions = jsonencode([
+    {
+      name="next"
+      image="${aws_ecr_repository.next.repository_url}:latest"
+      logConfiguration={
+        logDriver="awslogs"
+        options={
+          awslogs-region:"ap-northeast-1"
+          awslogs-group:"/ecs/${local.app_name}/next"
+          awslogs-stream-prefix:"ecs"
+        }
+      }
+      environmentFiles=[
+        {
+          value="arn:aws:s3:::${local.identifier}-${local.app_name}-env-file/next/.env"
+          type="s3"
+        }
+      ]
+    }
+  ])
+}
+
 #####################################################
 # ECS Service
 #####################################################
 
-resource "aws_ecs_service" "this" {
-  name = "${local.app_name}"
+resource "aws_ecs_service" "web" {
+  name = "${local.app_name}-web"
   cluster = aws_ecs_cluster.this.arn
-  task_definition = aws_ecs_task_definition.this.arn
+  task_definition = aws_ecs_task_definition.web.arn
   desired_count = 2
   deployment_minimum_healthy_percent = 100
   deployment_maximum_percent = 200
   enable_execute_command = true
   load_balancer {
     container_name = "web"
-    container_port = 80
+    container_port = 3030
     target_group_arn = aws_lb_target_group.ecs.arn
   }
   network_configuration {
@@ -161,6 +235,68 @@ resource "aws_ecs_service" "this" {
     base = 1
     weight = 1
   }
+  service_registries {
+    registry_arn = aws_service_discovery_service.services["web"].arn
+  }
+  depends_on = [aws_service_discovery_service.services]
+}
+
+resource "aws_ecs_service" "php" {
+  name = "${local.app_name}-php"
+  cluster = aws_ecs_cluster.this.arn
+  task_definition = aws_ecs_task_definition.php.arn
+  desired_count = 2
+  deployment_minimum_healthy_percent = 100
+  deployment_maximum_percent = 200
+  enable_execute_command = true
+  network_configuration {
+    assign_public_ip = false
+    security_groups = [
+      aws_security_group.vpc.id
+    ]
+    subnets = [
+      aws_subnet.private_1a.id,
+      aws_subnet.private_1c.id
+    ]
+  }
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE"
+    base = 1
+    weight = 1
+  }
+  service_registries {
+    registry_arn = aws_service_discovery_service.services["php"].arn
+  }
+  depends_on = [aws_service_discovery_service.services]
+}
+
+resource "aws_ecs_service" "next" {
+  name = "${local.app_name}-next"
+  cluster = aws_ecs_cluster.this.arn
+  task_definition = aws_ecs_task_definition.next.arn
+  desired_count = 2
+  deployment_minimum_healthy_percent = 100
+  deployment_maximum_percent = 200
+  enable_execute_command = true
+  network_configuration {
+    assign_public_ip = false
+    security_groups = [
+      aws_security_group.vpc.id
+    ]
+    subnets = [
+      aws_subnet.private_1a.id,
+      aws_subnet.private_1c.id
+    ]
+  }
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE"
+    base = 1
+    weight = 1
+  }
+  service_registries {
+    registry_arn = aws_service_discovery_service.services["next"].arn
+  }
+  depends_on = [aws_service_discovery_service.services]
 }
 
 #####################################################

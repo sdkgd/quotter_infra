@@ -1,0 +1,30 @@
+{
+  "family": "quotter-next",
+  "runtimePlatform": {"operatingSystemFamily": "LINUX"},
+  "taskRoleArn": "arn:aws:iam::AWS_ACCOUNT_ID:role/quotter-ecs-task-role",
+  "executionRoleArn": "arn:aws:iam::AWS_ACCOUNT_ID:role/quotter-ecs-task-execution-role",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name":"next",
+      "image":"",
+      "logConfiguration":{
+        "logDriver":"awslogs",
+        "options":{
+          "awslogs-region":"ap-northeast-1",
+          "awslogs-group":"/ecs/quotter/next",
+          "awslogs-stream-prefix":"ecs"
+        }
+      },
+      "environmentFiles":[
+        {
+          "value":"arn:aws:s3:::cognitobirm-quotter-env-file/next/.env",
+          "type":"s3"
+        }
+      ]
+    }
+  ]
+}

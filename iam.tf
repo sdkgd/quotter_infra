@@ -53,10 +53,13 @@ resource "aws_iam_policy" "s3" {
       {
         "Effect":"Allow"
         "Action":[
-          "s3:GetObject"
+          "s3:GetObject",
+          "s3:ListBucket",
         ]
         "Resource":[
+          "arn:aws:s3:::cognitobirm-quotter-env-file", 
           "arn:aws:s3:::cognitobirm-quotter-env-file/*",
+          "arn:aws:s3:::cognitobirm-quotter-task-definition-file",
           "arn:aws:s3:::cognitobirm-quotter-task-definition-file/*",
         ]
       },
@@ -104,7 +107,9 @@ resource "aws_iam_policy" "ecs" {
           "ecs:DescribeServices",
         ]
         "Resource":[
-          "arn:aws:ecs:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:service/${local.app_name}-app-cluster/${local.app_name}",
+          "arn:aws:ecs:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:service/${local.app_name}-app-cluster/${local.app_name}-web",
+          "arn:aws:ecs:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:service/${local.app_name}-app-cluster/${local.app_name}-php",
+          "arn:aws:ecs:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:service/${local.app_name}-app-cluster/${local.app_name}-next",
           "arn:aws:ecs:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:service/${local.app_name}-app-cluster/migration-service",
         ]
       },
