@@ -19,7 +19,10 @@ resource "aws_iam_policy" "s3_env_file" {
         },
         {
           "Effect":"Allow"
-          "Action":"s3:GetBucketLocation"
+          "Action":[
+            "s3:GetBucketLocation",
+            "s3:ListBucket",
+          ]
           "Resource":aws_s3_bucket.env_file.arn
         }
       ]
@@ -65,7 +68,10 @@ resource "aws_iam_policy" "s3_static_file" {
         },
         {
           "Effect":"Allow"
-          "Action":"s3:GetBucketLocation"
+          "Action":[
+            "s3:GetBucketLocation",
+            "s3:ListBucket",
+          ]
           "Resource":aws_s3_bucket.static_file.arn
         }
       ]

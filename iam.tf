@@ -53,10 +53,13 @@ resource "aws_iam_policy" "s3" {
       {
         "Effect":"Allow"
         "Action":[
-          "s3:GetObject"
+          "s3:GetObject",
+          "s3:ListBucket",
         ]
         "Resource":[
+          "arn:aws:s3:::cognitobirm-quotter-env-file",
           "arn:aws:s3:::cognitobirm-quotter-env-file/*",
+          "arn:aws:s3:::cognitobirm-quotter-task-definition-file",
           "arn:aws:s3:::cognitobirm-quotter-task-definition-file/*",
         ]
       },
